@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelime Çalışma</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3b5bdb">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kelimeler">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #f4f5f7; color: #222; margin: 0; padding: 20px;
+  }
+  .container { max-width: 700px; margin: 0 auto; }
+  h1 { text-align: center; margin-bottom: 4px; }
+  .stats { text-align: center; color: #666; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs button {
+    flex: 1; padding: 10px; border: none; border-radius: 8px;
+    background: #ddd; cursor: pointer; font-size: 15px;
+  }
+  .tabs button.active { background: #3b5bdb; color: #fff; }
+  .panel { display: none; background: #fff; padding: 20px; border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .panel.active { display: block; }
+  input, textarea {
+    width: 100%; padding: 10px; font-size: 15px; margin-bottom: 10px;
+    border: 1px solid #ccc; border-radius: 8px; font-family: inherit;
+  }
+  input[type=checkbox] { width: auto; margin: 0 6px 0 0; }
+  input[type=file] { border: none; padding: 0; }
+  textarea { min-height: 120px; }
+  #meaningInput { min-height: 70px; }
+  .btn {
+    padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 15px; color: #fff; background: #3b5bdb;
+  }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .btn.green { background: #2f9e44; }
+  .btn.red { background: #e03131; }
+  .btn.gray { background: #868e96; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .msg { color: #2f9e44; margin-top: 8px; min-height: 20px; }
+  .hint { color: #888; font-size: 13px; margin-bottom: 8px; }
+  .warn { color: #e8590c; font-size: 13px; text-align: center; margin-bottom: 10px; }
+
+  /* ---------- Sözlük kutusu ---------- */
+  .thes-box { background: #f1f3f5; border-radius: 10px; padding: 14px; margin-bottom: 16px; font-size: 14px; }
+  .thes-box b { font-size: 15px; }
+
+  /* ---------- Çalışma üst bilgi ---------- */
+  .quiz-top {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 14px; font-size: 14px; color: #555;
+  }
+  .progress { height: 6px; background: #e9ecef; border-radius: 3px; margin-bottom: 16px; overflow: hidden; }
+  .progress div { height: 100%; background: #3b5bdb; transition: width .3s; }
+
+  /* ---------- Dönen kart ---------- */
+  .flip { perspective: 1000px; height: 300px; cursor: pointer; margin-bottom: 20px; }
+  .flip-inner {
+    position: relative; width: 100%; height: 100%;
+    transition: transform .5s; transform-style: preserve-3d;
+  }
+  .flip.flipped .flip-inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; border-radius: 16px; padding: 20px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; overflow: auto;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  }
+  .front { background: #3b5bdb; color: #fff; }
+  .front .word { font-size: 42px; font-weight: bold; }
+  .front .tap { margin-top: 14px; font-size: 13px; opacity: .8; }
+  .back { background: #fff; border: 2px solid #3b5bdb; transform: rotateY(180deg); }
+  .back .word-small { font-size: 18px; color: #3b5bdb; font-weight: bold; margin-bottom: 10px; }
+  .back .tr { font-size: 20px; white-space: pre-line; line-height: 1.5; }
+  .back .syn { font-size: 14px; color: #2b8a3e; margin-top: 8px; }
+  .back .sense { font-size: 12px; color: #868e96; }
+  .back .def { font-size: 14px; color: #555; margin-top: 10px; }
+  .back .ex { font-size: 14px; color: #777; font-style: italic; margin-top: 6px; }
+  .quiz-buttons { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .quiz-buttons .btn { min-width: 150px; padding: 14px; font-size: 17px; }
+  .speak { position: absolute; top: 12px; right: 14px; background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; }
+
+  /* ---------- Eş anlamlı sorusu ---------- */
+  .syn-q {
+    background: #2f9e44; color: #fff; border-radius: 16px; padding: 30px 20px;
+    text-align: center; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  }
+  .syn-q .label { font-size: 15px; opacity: .9; margin-bottom: 8px; }
+  .syn-q .word { font-size: 38px; font-weight: bold; }
+  .options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .opt {
+    padding: 14px; font-size: 17px; border: 2px solid #ced4da; border-radius: 10px;
+    background: #fff; cursor: pointer; font-family: inherit;
+  }
+  .opt:hover:not(:disabled) { border-color: #3b5bdb; }
+  .opt.right { background: #d3f9d8; border-color: #2f9e44; }
+  .opt.wrong { background: #ffe3e3; border-color: #e03131; }
+  .syn-info { text-align: center; color: #555; font-size: 14px; margin-bottom: 14px; min-height: 20px; }
+
+  /* ---------- Liste / özet ---------- */
+  .list-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid #eee;
+  }
+  .list-item small { color: #888; white-space: pre-line; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 10px; margin-right: 8px; }
+  .tag.known { background: #d3f9d8; color: #2b8a3e; }
+  .tag.unknown { background: #ffe3e3; color: #c92a2a; }
+  .link-btn { background: none; border: none; color: #3b5bdb; cursor: pointer; font-size: 13px; white-space: nowrap; }
+  .summary { text-align: center; }
+  .summary .missed { text-align: left; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📚 Kelime Çalışma</h1>
+  <div style="text-align:center"><button class="btn green" id="installBtn" style="display:none;margin-bottom:10px">📲 Uygulamayı bu cihaza yükle</button></div>
+  <div class="stats" id="stats"></div>
+
+  <div class="tabs">
+    <button class="active" data-tab="quiz">Çalış</button>
+    <button data-tab="add">Kelime Ekle</button>
+    <button data-tab="list">Liste</button>
+  </div>
+
+  <!-- ÇALIŞ -->
+  <div class="panel active" id="quiz">
+    <div id="quizArea"><p style="text-align:center">Yükleniyor...</p></div>
+  </div>
+
+  <!-- EKLE -->
+  <div class="panel" id="add">
+    <h3>Tek kelime</h3>
+    <input id="wordInput" placeholder="İngilizce kelime (ör. abandon)">
+    <textarea id="meaningInput" placeholder="Türkçe anlamı (boş bırakırsan sözlükten gelir)"></textarea>
+    <div class="row">
+      <button class="btn gray" id="lookupBtn">🔍 Sözlükten getir</button>
+      <button class="btn" id="addBtn">Ekle</button>
+    </div>
+
+    <h3 style="margin-top:24px">Toplu ekleme</h3>
+    <div class="hint">Her satıra bir kelime yaz. Anlamını yazmak istersen: <b>kelime - anlam</b>. Yazmazsan sözlükten çekilir.</div>
+    <textarea id="bulkInput" placeholder="abandon&#10;acquire&#10;benefit - fayda"></textarea>
+    <button class="btn" id="bulkBtn">Hepsini Ekle</button>
+    <div class="msg" id="addMsg"></div>
+  </div>
+
+  <!-- LİSTE -->
+  <div class="panel" id="list">
+    <div class="thes-box">
+      <b>📘 Eş anlamlı sözlüğü</b>
+      <div id="thesStatus" style="margin:6px 0 10px"></div>
+      <input type="file" id="thesFile" accept=".jsonl,.json,.txt">
+      <div class="hint" style="margin:6px 0 0">
+        Sözlük dosyasını bir kez seçmen yeterli, tarayıcıya kaydedilir. Eş anlamlılar internetten değil bu dosyadan gelir.
+      </div>
+    </div>
+    <div class="thes-box">
+      <b>🔁 Cihazlar arasında taşı</b>
+      <div class="hint" style="margin:6px 0 10px">
+        Kelimelerin her cihazda ayrı saklanır. Bir cihazda <b>Dışa aktar</b> ile dosyaya kaydet,
+        diğer cihazda <b>İçe aktar</b> ile o dosyayı seç. Kelimeler birleştirilir, hiçbiri silinmez.
+      </div>
+      <div class="row">
+        <button class="btn" id="exportBtn">⬇ Kelimelerimi dışa aktar</button>
+        <label class="btn gray" style="display:inline-block">⬆ İçe aktar
+          <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+        </label>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn" id="refreshAllBtn">🔄 Anlamları sözlükten güncelle</button>
+      <button class="btn gray" id="resetKnownBtn">Bildiklerimi sıfırla</button>
+      <button class="btn red" id="clearAllBtn">Tümünü sil</button>
+    </div>
+    <div class="msg" id="listMsg"></div>
+    <div id="wordList"></div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = "kelimeCalisma";
+  const ROUND_KEY = "kelimeCalismaTur4";
+  let words = load();
+  let round = loadRound();   // { queue:[{w, t}], pos, missed:[], correct, synCount }
+  let current = null;        // ekrandaki kelime
+  let currentItem = null;    // ekrandaki soru
+  let answered = false;
+  let preparing = false;
+  let synMode = localStorage.getItem("synMode") !== "0";
+
+  // Daha önce internetten çekilmiş eş anlamlıları temizle (artık yerel sözlük kullanılıyor)
+  words.forEach(w => { delete w.synonyms; delete w.synChecked; });
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+  }
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+    updateStats();
+  }
+  function loadRound() {
+    try { return JSON.parse(localStorage.getItem(ROUND_KEY)); }
+    catch { return null; }
+  }
+  function saveRound() {
+    if (round) localStorage.setItem(ROUND_KEY, JSON.stringify(round));
+    else localStorage.removeItem(ROUND_KEY);
+  }
+
+  function updateStats() {
+    const known = words.filter(w => w.known).length;
+    document.getElementById("stats").textContent =
+      `Toplam: ${words.length} · Biliyorum: ${known} · Çalışılacak: ${words.length - known}`;
+  }
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function findWord(text) { return words.find(w => w.word === text); }
+
+  // ---------- Sekmeler ----------
+  document.querySelectorAll(".tabs button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.tab).classList.add("active");
+      if (btn.dataset.tab === "quiz") renderQuiz();
+      if (btn.dataset.tab === "list") renderList();
+    });
+  });
+
+  // ================== YDS EŞ ANLAMLI LİSTESİ ==================
+  // YDS'de sık çıkan kelimeler ve sınavda beklenen eş / yakın anlamlıları.
+  // Bir kelime bu listede varsa eş anlamlılar BURADAN gelir. İstersen satır ekleyip düzenleyebilirsin:
+  //   kelime: eş1, eş2, eş3
+  const YDS_TEXT = `
+abandon: give up, desert, leave, quit, forsake | terk etmek, vazgeçmek
+abundant: plentiful, ample, copious, rich | bol, bereketli
+accelerate: speed up, hasten, quicken | hızlandırmak, hızlanmak
+accomplish: achieve, complete, attain, fulfil | başarmak, tamamlamak
+accumulate: collect, gather, amass, build up | biriktirmek, birikmek
+accurate: precise, exact, correct | doğru, kesin, isabetli
+achieve: accomplish, attain, reach, realize | başarmak, elde etmek
+acquire: obtain, gain, get, attain | edinmek, kazanmak
+adapt: adjust, modify, alter | uyarlamak, uyum sağlamak
+adequate: sufficient, enough, satisfactory | yeterli
+adverse: harmful, negative, unfavourable | olumsuz, zararlı, ters
+advocate: support, promote, champion, back | savunmak, desteklemek
+affect: influence, impact | etkilemek
+allocate: assign, distribute, allot | tahsis etmek, ayırmak
+alleviate: relieve, ease, reduce, lessen, mitigate | hafifletmek, azaltmak
+alter: change, modify, transform | değiştirmek
+ambiguous: unclear, vague, equivocal | belirsiz, muğlak
+ample: plentiful, abundant, sufficient | bol, yeterli
+anticipate: expect, predict, foresee | beklemek, öngörmek
+apparent: obvious, evident, clear | açık, belli, görünür
+appropriate: suitable, proper, fitting | uygun
+approximately: roughly, about, nearly | yaklaşık olarak
+arbitrary: random, unpredictable | keyfi, rastgele
+assess: evaluate, judge, estimate, appraise | değerlendirmek
+assist: help, aid, support | yardım etmek
+assume: suppose, presume, believe | varsaymak, üstlenmek
+attain: achieve, reach, accomplish | ulaşmak, erişmek
+attribute: ascribe, credit, assign | atfetmek, (bir şeye) bağlamak
+augment: increase, expand, boost, enlarge | artırmak, çoğaltmak
+authentic: genuine, real, original | gerçek, özgün
+avoid: evade, escape, steer clear of | kaçınmak
+beneficial: useful, helpful, advantageous | yararlı, faydalı
+benefit: advantage, profit, gain | fayda, yarar; yararlanmak
+bias: prejudice, partiality | önyargı, taraflılık
+boost: increase, raise, enhance | artırmak, desteklemek
+brief: short, concise | kısa, öz
+capable: able, competent | yetenekli, muktedir
+cause: lead to, result in, bring about | neden olmak; neden
+cease: stop, end, halt, discontinue | durmak, sona ermek
+claim: assert, argue, state | iddia etmek; iddia
+coherent: consistent, logical | tutarlı, mantıklı
+collapse: fall down, break down, fail | çökmek, yıkılmak
+commence: begin, start | başlamak
+compensate: make up for, offset, pay back | telafi etmek, tazmin etmek
+competent: capable, skilled, able | yetkin, ehil
+compile: collect, gather, assemble | derlemek, toplamak
+complex: complicated, intricate | karmaşık
+comply: obey, conform, follow | uymak, riayet etmek
+comprehensive: thorough, complete, extensive, inclusive | kapsamlı
+comprise: consist of, include, contain | içermek, -den oluşmak
+conceal: hide, cover, disguise | gizlemek, saklamak
+concise: brief, short, succinct | kısa ve öz
+conclude: end, finish, infer | sonuçlandırmak, sonuç çıkarmak
+conduct: carry out, perform, do | yürütmek, yapmak
+confine: restrict, limit | sınırlamak, kapatmak
+confirm: verify, prove, validate | doğrulamak, onaylamak
+consequence: result, outcome, effect | sonuç
+consequently: therefore, thus, hence, as a result | sonuç olarak
+considerable: significant, substantial, large | hatırı sayılır, önemli ölçüde
+consistent: steady, constant, compatible | tutarlı, istikrarlı
+constant: continuous, steady, permanent | sabit, sürekli
+constitute: make up, form, compose | oluşturmak
+constrain: restrict, limit | kısıtlamak
+contemporary: modern, current, present-day | çağdaş, günümüze ait
+contradict: deny, oppose, refute | çelişmek, yalanlamak
+contribute: add to, give, donate | katkıda bulunmak
+controversial: debatable, disputed | tartışmalı
+convey: transmit, communicate, carry | iletmek, aktarmak
+convince: persuade | ikna etmek
+crucial: vital, essential, critical, important | çok önemli, kritik
+curb: restrain, limit, control | dizginlemek, frenlemek
+dangerous: hazardous, risky, unsafe | tehlikeli
+decline: decrease, fall, drop, refuse | azalmak, düşmek; reddetmek
+decrease: reduce, decline, diminish | azalmak, azaltmak
+deliberately: intentionally, on purpose | kasıtlı olarak, bilerek
+demonstrate: show, prove, display | göstermek, kanıtlamak
+deny: reject, refuse, contradict | inkâr etmek, reddetmek
+deplete: exhaust, use up, consume | tüketmek, azaltmak
+derive: obtain, get, originate | elde etmek, türetmek; -den kaynaklanmak
+deteriorate: worsen, decline, degrade | kötüleşmek, bozulmak
+determine: decide, establish, find out | belirlemek, karar vermek
+devastate: destroy, ruin, wreck | harap etmek, yıkmak
+difficult: hard, tough, challenging | zor
+diminish: decrease, reduce, lessen | azalmak, azaltmak
+discard: throw away, abandon, dispose of | atmak, elden çıkarmak
+disclose: reveal, expose, uncover | açıklamak, ifşa etmek
+discrepancy: difference, inconsistency | tutarsızlık, fark
+disperse: scatter, spread | dağıtmak, dağılmak
+disrupt: interrupt, disturb | bozmak, sekteye uğratmak
+distinct: different, separate, clear | belirgin, farklı
+distinguish: differentiate, tell apart | ayırt etmek
+diverse: varied, various, different | çeşitli, farklı
+dominant: main, prevailing, leading | baskın, hâkim
+drastic: extreme, severe, radical | sert, köklü, radikal
+durable: lasting, long-lasting, sturdy | dayanıklı
+eliminate: remove, get rid of, eradicate | ortadan kaldırmak, elemek
+emerge: appear, arise, come out | ortaya çıkmak
+emphasize: stress, highlight, underline | vurgulamak
+enable: allow, permit | olanak sağlamak
+encounter: meet, come across, face | karşılaşmak
+endure: tolerate, bear, stand, last | dayanmak, katlanmak; sürmek
+enhance: improve, increase, boost | geliştirmek, artırmak
+enormous: huge, vast, immense | muazzam, devasa
+ensure: guarantee, make sure, secure | sağlamak, garanti etmek
+entire: whole, complete, total | bütün, tüm
+equivalent: equal, identical | eşdeğer
+eradicate: eliminate, wipe out, destroy | kökünü kazımak, yok etmek
+essential: vital, crucial, necessary | temel, gerekli, çok önemli
+establish: found, set up, create | kurmak, tesis etmek
+estimate: assess, calculate, evaluate | tahmin etmek
+evaluate: assess, judge, appraise | değerlendirmek
+eventually: finally, ultimately, in the end | sonunda, nihayetinde
+evident: obvious, clear, apparent | açık, belli
+evolve: develop, grow | evrimleşmek, gelişmek
+exaggerate: overstate, inflate, magnify | abartmak
+exceed: surpass, go beyond | aşmak
+exclude: leave out, omit, rule out | dışlamak, hariç tutmak
+exhaust: use up, deplete, tire | tüketmek; yormak
+expand: grow, enlarge, extend, increase | genişlemek, genişletmek
+explicit: clear, direct, obvious | açık, net
+exploit: use, take advantage of | sömürmek, istismar etmek; yararlanmak
+extensive: wide, broad, comprehensive | geniş, kapsamlı
+facilitate: ease, help, simplify | kolaylaştırmak
+feasible: possible, practical, viable | uygulanabilir, yapılabilir
+flaw: defect, fault, weakness | kusur
+flexible: adaptable, adjustable | esnek
+fluctuate: vary, change, rise and fall | dalgalanmak, inip çıkmak
+foster: encourage, promote, nurture | teşvik etmek, beslemek
+fragile: delicate, weak, breakable | kırılgan
+frequently: often, regularly, commonly | sık sık
+fundamental: basic, essential, primary | temel
+furthermore: moreover, besides, in addition | ayrıca, üstelik
+generate: produce, create | üretmek, oluşturmak
+genuine: real, authentic | gerçek, samimi
+gradually: slowly, steadily, step by step | yavaş yavaş, kademeli olarak
+happy: glad, pleased, cheerful, content | mutlu
+harm: damage, hurt, injure | zarar vermek; zarar
+hazardous: dangerous, risky | tehlikeli
+hence: therefore, thus, consequently | bu nedenle
+hinder: hamper, obstruct, impede | engellemek
+however: nevertheless, yet, but | ancak, fakat
+huge: enormous, vast, immense | kocaman, devasa
+identical: same, alike | aynı, özdeş
+ignore: disregard, neglect, overlook | görmezden gelmek
+immense: huge, vast, enormous | muazzam, çok büyük
+impair: damage, weaken, harm | bozmak, zayıflatmak
+implement: carry out, apply, execute | uygulamak, yürürlüğe koymak
+imply: suggest, indicate, hint | ima etmek
+important: significant, crucial, vital | önemli
+impose: enforce, inflict | dayatmak, (vergi, yasak vb.) koymak
+improve: enhance, better, upgrade | geliştirmek, iyileştirmek
+incentive: motivation, encouragement, stimulus | teşvik
+increase: rise, grow, raise | artmak, artırmak
+indicate: show, signal, point out | göstermek, belirtmek
+inevitable: unavoidable, certain, inescapable | kaçınılmaz
+inhibit: prevent, restrain, hinder | engellemek, bastırmak
+initial: first, early, primary | ilk, başlangıçtaki
+innovative: new, original, creative | yenilikçi
+insufficient: inadequate, lacking | yetersiz
+intense: strong, extreme, severe | yoğun, şiddetli
+interpret: explain, understand | yorumlamak
+intervene: interfere, step in | müdahale etmek
+intricate: complex, complicated | karmaşık, girift
+investigate: examine, explore, study | araştırmak, soruşturmak
+isolated: remote, separate, lonely | izole, yalıtılmış, ıssız
+justify: defend, explain | haklı çıkarmak, gerekçelendirmek
+likewise: similarly, also | aynı şekilde
+maintain: keep, preserve, sustain, claim | sürdürmek, korumak; iddia etmek
+major: main, chief, significant | büyük, başlıca
+manipulate: control, handle, influence | manipüle etmek, yönlendirmek
+mature: adult, grown, developed | olgun
+merely: only, just, simply | sadece, yalnızca
+minimize: reduce, lessen | en aza indirmek
+moreover: furthermore, besides, in addition | üstelik, ayrıca
+mutual: shared, common, reciprocal | karşılıklı, ortak
+neglect: ignore, disregard, overlook | ihmal etmek
+nevertheless: however, nonetheless, yet, still | yine de, buna rağmen
+notable: remarkable, significant, noteworthy | dikkate değer, kayda değer
+notion: idea, concept, belief | kavram, fikir
+notwithstanding: despite, in spite of | -e rağmen
+numerous: many, plenty, countless | çok sayıda
+objective: aim, goal, purpose | amaç, hedef; nesnel
+obligatory: compulsory, mandatory, required | zorunlu
+obscure: unclear, vague, unknown | belirsiz, anlaşılmaz; az bilinen
+obstacle: barrier, hindrance, obstruction | engel
+obtain: acquire, get, gain | elde etmek
+obvious: clear, evident, apparent | açık, belli
+occur: happen, take place | meydana gelmek
+offset: compensate, balance | dengelemek, telafi etmek
+ongoing: continuing, current | devam eden, süregelen
+overcome: defeat, conquer, beat | üstesinden gelmek
+overlook: ignore, miss, neglect | gözden kaçırmak, görmezden gelmek
+paramount: supreme, primary, most important | en önemli, üstün
+persist: continue, last, endure | sürmek, ısrar etmek
+persuade: convince | ikna etmek
+phenomenon: event, occurrence | olgu, fenomen
+plausible: believable, reasonable, credible | makul, akla yatkın
+postpone: delay, put off | ertelemek
+precise: exact, accurate | kesin, tam
+predominantly: mainly, mostly, chiefly | ağırlıklı olarak, çoğunlukla
+preliminary: initial, introductory, preparatory | ön, hazırlık niteliğinde
+presume: assume, suppose | varsaymak, farz etmek
+prevalent: common, widespread | yaygın
+prevent: stop, avoid, hinder | önlemek, engellemek
+primarily: mainly, chiefly, mostly | öncelikle, esas olarak
+principal: main, chief, primary | başlıca, asıl
+profound: deep, intense | derin, köklü
+prohibit: ban, forbid, bar | yasaklamak
+prominent: important, famous, noticeable | önde gelen, belirgin
+promote: encourage, support, advance | teşvik etmek, desteklemek
+prompt: cause, trigger, quick | neden olmak, harekete geçirmek; hızlı
+prone: likely, inclined, liable | eğilimli, yatkın
+prosperous: wealthy, rich, successful | müreffeh, varlıklı
+pursue: follow, chase, seek | peşinden koşmak, sürdürmek
+radical: extreme, drastic, fundamental | köklü, radikal
+rapid: fast, quick, swift | hızlı
+rare: uncommon, unusual, scarce | nadir
+readily: easily, willingly | kolayca; isteyerek
+reduce: decrease, lessen, diminish, cut | azaltmak
+reinforce: strengthen, support | güçlendirmek
+reject: refuse, decline, turn down | reddetmek
+relevant: related, pertinent | ilgili, alakalı
+reluctant: unwilling, hesitant, loath | isteksiz, gönülsüz
+remarkable: extraordinary, notable, striking | dikkat çekici, olağanüstü
+remote: distant, far, isolated | uzak, ıssız
+replace: substitute, take the place of | yerine koymak, yerini almak
+require: need, demand | gerektirmek
+reside: live, dwell | ikamet etmek, oturmak
+resolve: solve, settle, decide | çözmek; karar vermek
+restrict: limit, confine | kısıtlamak
+retain: keep, hold, preserve | elde tutmak, korumak
+reveal: disclose, show, uncover, expose | ortaya çıkarmak, açığa vurmak
+reverse: invert, undo, overturn | tersine çevirmek
+rigid: stiff, strict, inflexible | katı, esnek olmayan
+scarce: rare, insufficient, limited | kıt, az bulunur
+scrutinize: examine, inspect | dikkatle incelemek
+seek: look for, search for, pursue | aramak, peşinde olmak
+severe: serious, harsh, extreme | şiddetli, ciddi, sert
+significant: important, considerable, notable | önemli, anlamlı
+similar: alike, comparable | benzer
+simultaneously: at the same time, concurrently | aynı anda, eş zamanlı
+sole: only, single | tek, yegâne
+sophisticated: complex, advanced, refined | gelişmiş, karmaşık; sofistike
+sparse: scattered, thin, scarce | seyrek, dağınık
+spontaneous: unplanned, impulsive | kendiliğinden, plansız
+stable: steady, firm, constant | istikrarlı, sabit
+subsequent: following, later, next | sonraki
+substantial: considerable, large, significant | önemli, büyük miktarda
+subtle: slight, delicate, faint | ince, belli belirsiz
+sufficient: enough, adequate | yeterli
+superior: better, higher | üstün, daha iyi
+suppress: restrain, crush, hold back | bastırmak
+sustain: maintain, support, keep up | sürdürmek, desteklemek
+tackle: deal with, handle, address | ele almak, uğraşmak
+tedious: boring, dull, tiresome | sıkıcı, usandırıcı
+temporary: short-term, transient, brief | geçici
+thereby: thus, by that means | böylece, bu suretle
+thorough: complete, comprehensive, careful | titiz, eksiksiz
+thrive: flourish, prosper | gelişmek, serpilmek
+thus: therefore, hence, so | böylece, bu yüzden
+tremendous: huge, enormous, great | muazzam, çok büyük
+trigger: cause, provoke, set off | tetiklemek
+ultimate: final, last, eventual | nihai, son
+ultimately: eventually, finally, in the end | nihayetinde, sonunda
+undergo: experience, go through | geçirmek, maruz kalmak
+undermine: weaken, damage | baltalamak, zayıflatmak
+unprecedented: unique, extraordinary, new | eşi görülmemiş, emsalsiz
+utilize: use, employ | kullanmak, yararlanmak
+vague: unclear, ambiguous, obscure | belirsiz, muğlak
+valid: legitimate, sound, acceptable | geçerli
+vanish: disappear, fade | kaybolmak, yok olmak
+vast: huge, enormous, immense | geniş, muazzam
+verify: confirm, check, prove | doğrulamak
+viable: feasible, workable, possible | uygulanabilir, yaşayabilir
+vital: essential, crucial, necessary | hayati, çok önemli
+vulnerable: weak, defenceless, susceptible | savunmasız, hassas
+whereas: while | oysa, -iken
+widespread: common, prevalent, extensive | yaygın
+withdraw: remove, pull out, retreat | geri çekmek, çekilmek
+yield: produce, give, surrender | (ürün, sonuç) vermek; boyun eğmek
+due to: because of, owing to | -den dolayı, nedeniyle
+in spite of: despite, notwithstanding | -e rağmen
+deal with: handle, cope with, tackle | ilgilenmek, başa çıkmak
+carry out: conduct, perform, implement | yürütmek, gerçekleştirmek
+account for: explain, constitute | açıklamak; (oranını) oluşturmak
+point out: indicate, mention | belirtmek, işaret etmek
+give up: abandon, quit, stop | vazgeçmek, bırakmak
+take place: happen, occur | gerçekleşmek, meydana gelmek
+bring about: cause, lead to | neden olmak, yol açmak
+put off: postpone, delay | ertelemek
+call off: cancel | iptal etmek
+look into: investigate, examine | incelemek, araştırmak
+set up: establish, found | kurmak
+come up with: think of, devise | (fikir) bulmak, ortaya atmak
+rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
+`;
+  const YDS = Object.create(null), YDS_REV = Object.create(null), YDS_TR = Object.create(null);   // "constructor" gibi kelimeler sorun çıkarmasın
+  YDS_TEXT.split("\n").forEach(line => {
+    const m = line.match(/^\s*([^:#]+):([^|]*)(?:\|(.*))?$/);   // kelime: eş1, eş2 | türkçesi
+    if (!m) return;
+    const head = m[1].trim().toLowerCase();
+    const syns = m[2].split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    YDS[head] = syns;
+    if (m[3]) YDS_TR[head] = m[3].trim();
+    syns.forEach(s => {                     // ters bağlantı: "relieve" → "alleviate"
+      const r = YDS_REV[s] || (YDS_REV[s] = []);
+      if (!r.includes(head)) r.push(head);
+    });
+  });
+  const YDS_WORDS = Object.keys(YDS).filter(k => !k.includes(" "));   // yanlış şıklar için
+
+  // ================== YEREL EŞ ANLAMLI SÖZLÜĞÜ (WordNet) ==================
+  // YDS listesinde olmayan kelimeler için kullanılır. Dosya bir kez seçilir, tarayıcıya (IndexedDB) kaydedilir.
+  // Kelimenin her anlamı ayrı tutulur; Google'dan gelen kelime türüne (fiil/isim/sıfat/zarf) uyan anlamlar seçilir.
+  const THES_KEY = "thes2";
+  let thes = null;   // { syn: [[tür, [üyeler], açıklama], ...], idx: { kelime: [syn no, ...] } }
+  let blocked = new Set(JSON.parse(localStorage.getItem("synBlock") || "[]"));   // "kelime|eş" çiftleri
+
+  const POS_TR = { n: "isim", v: "fiil", a: "sıfat", r: "zarf" };
+  const TR_POS = { "isim": "n", "fiil": "v", "sıfat": "a", "zarf": "r" };
+  const BAD_WORDS = new Set(["piss", "pee", "pee-pee", "piddle", "wee", "wee-wee", "crap", "shit", "fuck",
+    "ass", "arse", "bitch", "bastard", "dick", "cock", "prick", "pussy", "tit", "tits", "boob", "boobs",
+    "turd", "fart", "bonk", "shag", "hump", "screw", "bang", "take a leak", "take a crap", "jerk off"]);
+
+  function idbOpen() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("kelimeCalismaDB", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbGet(key) {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const q = db.transaction("kv").objectStore("kv").get(key);
+      q.onsuccess = () => res(q.result);
+      q.onerror = () => rej(q.error);
+    });
+  }
+  async function idbSet(key, value) {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx = db.transaction("kv", "readwrite");
+      if (value === undefined) tx.objectStore("kv").delete(key);
+      else tx.objectStore("kv").put(value, key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+
+  function normWord(s) {
+    return String(s || "").replace(/\((a|p|ip)\)/g, "").replace(/_/g, " ")
+      .toLowerCase().replace(/\s+/g, " ").trim();
+  }
+  // Sadece yazım farkı olanları yakalamak için (analogize / analogise, flat-bottom / flatbottom)
+  function variantKey(s) {
+    return s.replace(/[-\s'.]/g, "").replace(/s/g, "z").replace(/our/g, "or").replace(/re$/, "er");
+  }
+  function sameRoot(a, b) {
+    if (a === b) return true;
+    if (a.length >= 5 && b.length >= 5 && a.slice(0, 5) === b.slice(0, 5)) return true;
+    return a.startsWith(b) || b.startsWith(a);
+  }
+  // İki kelime arasındaki harf farkı (endorse / indorse gibi yazım varyantlarını atmak için)
+  function editDistance(a, b) {
+    if (Math.abs(a.length - b.length) > 2) return 3;
+    let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++)
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  function goodMember(m) {
+    return m && m.length <= 25 && m.split(" ").length <= 3 && /^[a-z][a-z' -]*$/.test(m) && !BAD_WORDS.has(m);
+  }
+
+  async function buildThesaurus(text, onProgress) {
+    const groups = new Map();                    // kimlik → { p, m: [], d }
+    const headOrder = [];                        // [kelime, kimlik] — anlam sırası için
+    const addGroup = (id, p, head, syns, desc) => {
+      head = normWord(head);
+      let g = groups.get(id);
+      if (!g) { g = { p, m: [], keys: new Set(), d: desc }; groups.set(id, g); }
+      [head, ...syns.map(normWord)].forEach(m => {
+        if (!goodMember(m)) return;
+        const k = variantKey(m);
+        if (g.keys.has(k)) return;
+        g.keys.add(k); g.m.push(m);
+      });
+      if (goodMember(head)) headOrder.push([head, id]);
+    };
+    const posLetter = p => ({ noun: "n", verb: "v", adj: "a", adv: "r", s: "a" }[p] || "");
+    text = text.trim();
+
+    if (text.startsWith("[") || (text.startsWith("{") && !/\}\s*\r?\n\s*\{/.test(text.slice(0, 200000)))) {
+      const data = JSON.parse(text);
+      const list = Array.isArray(data) ? data
+        : Object.keys(data).map(k => ({ word: k, synonyms: Array.isArray(data[k]) ? data[k] : (data[k].synonyms || []) }));
+      list.forEach((o, i) => addGroup("L" + i, posLetter(o.pos), o.word || o.key, o.synonyms || [], ""));
+    } else {
+      const lines = text.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        if (line.startsWith("{")) {
+          try {
+            const o = JSON.parse(line);
+            const head = o.word || o.key || "";
+            if (/^[A-Z]/.test(head)) continue;          // özel isimler (Alabama, Satan...)
+            const id = (o.pos || "") + ":" + (o.wordnet_id || "L" + i);
+            const desc = Array.isArray(o.desc) ? (o.desc[0] || "") : (o.desc || "");
+            addGroup(id, posLetter(o.pos), head, o.synonyms || [], String(desc).slice(0, 90));
+          } catch (e) { /* bozuk satır */ }
+        } else {
+          const parts = line.split(",");
+          addGroup("L" + i, "", parts[0], parts.slice(1), "");
+        }
+        if (i % 20000 === 0) {
+          onProgress && onProgress(i / lines.length);
+          await new Promise(r => setTimeout(r));
+        }
+      }
+    }
+
+    // Sadece en az 2 üyesi olan gruplar işe yarar
+    const syn = [], idOf = new Map(), idx = new Map();
+    for (const [id, g] of groups) {
+      if (g.m.length < 2) continue;
+      idOf.set(id, syn.length);
+      syn.push([g.p, g.m, g.d]);
+    }
+    const push = (w, k) => { let a = idx.get(w); if (!a) idx.set(w, a = []); if (!a.includes(k)) a.push(k); };
+    headOrder.forEach(([w, id]) => { if (idOf.has(id)) push(w, idOf.get(id)); });   // kendi anlam sırası önce
+    syn.forEach((s, k) => s[1].forEach(m => push(m, k)));                          // iki yönlü bağlantı
+    return { syn, idx };
+  }
+
+  function setThes(data) {
+    thes = data;
+    renderThesStatus();
+  }
+
+  function renderThesStatus() {
+    const el = document.getElementById("thesStatus");
+    const reload = !thes && localStorage.getItem("thesNeedsReload")
+      ? `<b style="color:#e8590c">Sözlük yeni (YDS'ye uygun) biçimde işlenecek, dosyayı bir kez daha seç.</b><br>` : "";
+    if (thes) localStorage.removeItem("thesNeedsReload");
+    el.innerHTML = reload + (thes
+      ? `✔ Yüklü: <b>${thes.idx.size.toLocaleString("tr-TR")}</b> kelime. Başka bir dosya seçersen onunla değiştirilir.`
+      : `Henüz yüklenmedi. Eş anlamlı sözlük dosyasını seç (en_thesaurus.jsonl).<br>
+         <small>YDS listesindeki ${Object.keys(YDS).length} kelimenin eş anlamlıları sözlüksüz de çalışır.</small>`);
+  }
+
+  document.getElementById("thesFile").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const el = document.getElementById("thesStatus");
+    try {
+      el.textContent = "Dosya okunuyor...";
+      const data = await buildThesaurus(await file.text(), p => el.textContent = `İşleniyor... %${Math.round(p * 100)}`);
+      const count = data.idx.size;
+      if (count === 0) { el.textContent = "Bu dosyada eş anlamlı bulunamadı. Dosya biçimini kontrol et."; return; }
+      el.textContent = "Kaydediliyor...";
+      await idbSet(THES_KEY, data);
+      setThes(data);
+      round = null; saveRound();                 // yeni eş anlamlılarla yeni tur
+      showMsg("listMsg", `Eş anlamlı sözlüğü yüklendi (${count.toLocaleString("tr-TR")} kelime).`);
+      renderList();
+    } catch (err) {
+      el.textContent = "Dosya okunamadı: " + err.message;
+    }
+    e.target.value = "";
+  });
+
+  // Çekimli hâlleri köke indirerek ara: abandoned → abandon, studies → study
+  function findKey(w, has) {
+    if (has(w)) return w;
+    const tries = [w.replace(/ies$/, "y"), w.replace(/es$/, ""), w.replace(/s$/, ""), w.replace(/ied$/, "y"),
+                   w.replace(/ed$/, ""), w.replace(/d$/, ""), w.replace(/ing$/, ""), w.replace(/ing$/, "e"),
+                   w.replace(/is(e|ed|es|ing)$/, "iz$1"), w.replace(/our$/, "or")];   // İngiliz yazımı: scrutinise → scrutinize
+    for (const t of tries) if (t !== w && has(t)) return t;
+    return null;
+  }
+
+  // Google'dan gelen anlamdaki kelime türleri: "fiil: terk etmek..." → v
+  function posFromMeaning(meaning) {
+    const out = [];
+    String(meaning || "").split("\n").forEach(l => {
+      const m = l.match(/^\s*([^:]{2,12}):/);
+      const p = m && TR_POS[m[1].trim().toLocaleLowerCase("tr")];
+      if (p && !out.includes(p)) out.push(p);
+    });
+    return out;
+  }
+
+  // Sonuç: { source: "yds" | "wn" | null, groups: [{ label, syns }], flat: [...] }
+  function synInfo(word, meaning) {
+    const w = normWord(word);
+    const ok = s => s && s !== w && !blocked.has(w + "|" + s);
+
+    // 1) YDS listesi
+    const yk = findKey(w, k => YDS[k] || YDS_REV[k]);
+    if (yk) {
+      const list = [...new Set([...(YDS[yk] || []), ...(YDS_REV[yk] || [])])].filter(s => ok(s) && s !== yk);
+      if (list.length) return { source: "yds", groups: [{ label: "", syns: list }], flat: list.slice(0, 8), tr: YDS_TR[yk] || "" };
+    }
+
+    // 2) WordNet
+    if (!thes) return { source: null, groups: [], flat: [] };
+    const k = findKey(w, x => thes.idx.has(x));
+    if (!k) return { source: null, groups: [], flat: [] };
+    const want = posFromMeaning(meaning);
+    let ids = thes.idx.get(k);
+    if (want.length) {
+      const f = ids.filter(i => want.includes(thes.syn[i][0]));
+      if (f.length) ids = f.sort((a, b) => want.indexOf(thes.syn[a][0]) - want.indexOf(thes.syn[b][0]));
+    }
+    // Anlamları sırala: önce Google'ın verdiği kelime türü sırası, sonra eş anlamlıları en yaygın olan anlam
+    let groups = [];
+    ids.forEach(i => {
+      const [p, members, d] = thes.syn[i];
+      const syns = members.filter(m => ok(m) && m !== k && !sameRoot(m, k) && editDistance(m, k) > 1)
+        .sort((a, b) => commonness(b) - commonness(a));
+      if (!syns.length) return;
+      const posRank = want.length ? want.indexOf(p) : 0;
+      groups.push({ label: (POS_TR[p] ? POS_TR[p] + " · " : "") + d, syns, posRank, score: commonness(syns[0]) });
+    });
+    groups.sort((a, b) => a.posRank - b.posRank || b.score - a.score);
+    groups = groups.slice(0, 3);
+    const flat = [];
+    groups.forEach(g => g.syns.forEach(s => { if (!flat.includes(s)) flat.push(s); }));
+    return { source: groups.length ? "wn" : null, groups, flat: flat.slice(0, 8) };
+  }
+
+  // Ne kadar yaygın? (WordNet'te kaç anlamı var — çok anlamlı kelimeler genelde yaygındır)
+  function commonness(s) {
+    if (YDS[s] || YDS_REV[s]) return 100;
+    return thes && thes.idx.has(s) ? thes.idx.get(s).length : 0;
+  }
+
+  async function loadThesaurus() {
+    try {
+      const saved = await idbGet(THES_KEY);
+      if (saved && saved.idx instanceof Map) { setThes(saved); return; }
+      if (await idbGet("thesaurus")) {           // eski biçim: sil, dosyanın yeniden seçilmesi gerekiyor
+        await idbSet("thesaurus", undefined);
+        localStorage.setItem("thesNeedsReload", "1");
+      }
+    } catch (e) { /* veritabanı yok */ }
+    // Live Server ile açıldıysa ve dosya HTML ile aynı klasördeyse kendiliğinden yükle
+    for (const name of ["en_thesaurus.jsonl", "thesaurus.json", "mthesaur.txt"]) {
+      try {
+        const r = await fetch(name);
+        if (!r.ok) continue;
+        const data = await buildThesaurus(await r.text());
+        if (data.idx.size) { await idbSet(THES_KEY, data); setThes(data); return; }
+      } catch (e) { /* dosya yok ya da file:// ile açılmış */ }
+    }
+    setThes(null);
+  }
+
+  // ================== TÜRKÇE ANLAM SÖZLÜĞÜ ==================
+  // Türkçe anlam: Google Çeviri sözlüğü (yedek: MyMemory)
+  // İngilizce tanım + örnek cümle: Free Dictionary
+  const cache = Object.create(null);
+
+  async function googleDictionary(word) {
+    const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=tr&hl=tr&dt=t&dt=bd&q="
+      + encodeURIComponent(word);
+    const data = await (await fetch(url)).json();
+    const lines = [];
+    if (Array.isArray(data[1])) {
+      data[1].forEach(entry => {
+        const type = entry[0];                     // fiil, isim, sıfat...
+        const terms = (entry[1] || []).slice(0, 6);
+        if (terms.length) lines.push((type ? type + ": " : "") + terms.join(", "));
+      });
+    }
+    if (!lines.length && Array.isArray(data[0])) {
+      const t = data[0].map(x => x[0]).join("").trim();
+      if (t && t.toLowerCase() !== word) lines.push(t);
+    }
+    return lines.join("\n");
+  }
+
+  async function myMemory(word) {
+    const url = "https://api.mymemory.translated.net/get?langpair=en|tr&q=" + encodeURIComponent(word);
+    const data = await (await fetch(url)).json();
+    const t = (data.responseData && data.responseData.translatedText || "").trim();
+    return t && t.toLowerCase() !== word ? t : "";
+  }
+
+  async function englishDefinition(word) {
+    const r = await fetch("https://api.dictionaryapi.dev/api/v2/entries/en/" + encodeURIComponent(word));
+    if (!r.ok) return { definition: "", example: "" };
+    const data = await r.json();
+    let definition = "", example = "";
+    for (const entry of data) {
+      for (const m of entry.meanings) {
+        for (const d of m.definitions) {
+          if (!definition) definition = `(${m.partOfSpeech}) ${d.definition}`;
+          if (!example && d.example) example = d.example;
+        }
+      }
+    }
+    return { definition, example };
+  }
+
+  // Sonuç: { meaning, definition, example }
+  async function fetchMeaning(word) {
+    word = word.trim().toLowerCase();
+    if (!word) return { meaning: "", definition: "", example: "" };
+    if (cache[word]) return cache[word];
+
+    const [tr, en] = await Promise.all([
+      googleDictionary(word).catch(() => ""),
+      englishDefinition(word).catch(() => ({ definition: "", example: "" }))
+    ]);
+    let meaning = tr;
+    if (!meaning) meaning = await myMemory(word).catch(() => "");
+
+    const result = { meaning, definition: en.definition, example: en.example };
+    if (meaning || en.definition) cache[word] = result;
+    return result;
+  }
+
+  // ---------- Kelime ekleme ----------
+  let lastLookup = null;
+
+  function addWord(word, meaning, extra) {
+    word = word.trim(); meaning = (meaning || "").trim();
+    if (!word) return false;
+    extra = extra || {};
+    const exists = words.find(w => w.word.toLowerCase() === word.toLowerCase());
+    if (exists) {
+      if (meaning) exists.meaning = meaning;
+      if (extra.definition) exists.definition = extra.definition;
+      if (extra.example) exists.example = extra.example;
+      return false;
+    }
+    words.push({
+      word, meaning,
+      definition: extra.definition || "", example: extra.example || "",
+      known: false, wrong: 0
+    });
+    return true;
+  }
+
+  function showMsg(id, text) {
+    const m = document.getElementById(id);
+    m.textContent = text;
+    clearTimeout(m._t);
+    m._t = setTimeout(() => m.textContent = "", 3000);
+  }
+
+  async function lookupIntoInput() {
+    const w = document.getElementById("wordInput");
+    const m = document.getElementById("meaningInput");
+    if (!w.value.trim()) return;
+    m.value = ""; m.placeholder = "Sözlükte aranıyor...";
+    const res = await fetchMeaning(w.value);
+    lastLookup = { word: w.value.trim().toLowerCase(), ...res };
+    m.placeholder = "Türkçe anlamı (boş bırakırsan sözlükten gelir)";
+    if (res.meaning) m.value = res.meaning;
+    else showMsg("addMsg", "Sözlükte bulunamadı, anlamı elle yazabilirsin.");
+  }
+
+  document.getElementById("lookupBtn").addEventListener("click", lookupIntoInput);
+  document.getElementById("wordInput").addEventListener("blur", () => {
+    if (!document.getElementById("meaningInput").value.trim()) lookupIntoInput();
+  });
+
+  document.getElementById("addBtn").addEventListener("click", async () => {
+    const w = document.getElementById("wordInput");
+    const m = document.getElementById("meaningInput");
+    const word = w.value.trim();
+    if (!word) return;
+    let extra = (lastLookup && lastLookup.word === word.toLowerCase()) ? lastLookup : null;
+    if (!extra) extra = await fetchMeaning(word);
+    if (!m.value.trim()) m.value = extra.meaning || "";
+    if (addWord(word, m.value, extra)) showMsg("addMsg", `"${word}" eklendi.`);
+    else showMsg("addMsg", "Bu kelime zaten listede (bilgileri güncellendi).");
+    save();
+    w.value = ""; m.value = ""; lastLookup = null; w.focus();
+  });
+
+  document.getElementById("wordInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("meaningInput").focus(); }
+  });
+  document.getElementById("meaningInput").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); document.getElementById("addBtn").click(); }
+  });
+
+  document.getElementById("bulkBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("bulkBtn");
+    const lines = document.getElementById("bulkInput").value.split("\n").filter(l => l.trim());
+    let count = 0;
+    btn.disabled = true;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      btn.textContent = `Ekleniyor... (${i + 1}/${lines.length})`;
+      const m = line.match(/^(.+?)\s+[-–:=]\s+(.*)$/) || line.match(/^(.+?)\t(.*)$/) || line.match(/^(.+?)[:=](.*)$/);
+      const word = m ? m[1] : line;
+      let meaning = m ? m[2].trim() : "";
+      const extra = await fetchMeaning(word);
+      if (!meaning) meaning = extra.meaning;
+      if (addWord(word, meaning, extra)) count++;
+    }
+    btn.disabled = false;
+    btn.textContent = "Hepsini Ekle";
+    save();
+    document.getElementById("bulkInput").value = "";
+    showMsg("addMsg", `${count} yeni kelime eklendi.`);
+  });
+
+  // ================== ÇALIŞMA TURU ==================
+  // Bir turda her kelime bir kez sorulur. Eş anlamlı soruları anlam kartlarının arasına karışık gelir
+  // (kendi kartından en az 2 soru sonra). Bilinemeyenler tur sonunda listelenir.
+
+  function startRound(list) {
+    const cards = shuffle(list);
+    const queue = cards.map(w => ({ w: w.word, t: "m" }));
+    let synCount = 0;
+    if (synMode) {
+      cards.filter(w => synInfo(w.word, w.meaning).flat.length).forEach(w => {
+        const idx = queue.findIndex(q => q.w === w.word && q.t === "m");
+        const min = Math.min(idx + 3, queue.length);
+        const pos = min + Math.floor(Math.random() * (queue.length - min + 1));
+        queue.splice(pos, 0, { w: w.word, t: "s" });
+        synCount++;
+      });
+    }
+    round = { queue, pos: 0, missed: [], correct: 0, synCount };
+    saveRound();
+    renderQuiz();
+  }
+
+  function newRound() {
+    round = null; saveRound();
+    renderQuiz();
+  }
+
+  function retryMissed() {
+    const list = round.missed.map(findWord).filter(Boolean);
+    list.forEach(w => w.known = false);
+    save();
+    startRound(list);
+  }
+
+  function addMissed(w) {
+    if (!round.missed.includes(w.word)) round.missed.push(w.word);
+  }
+
+  function advance() {
+    round.pos++;
+    saveRound();
+    renderQuiz();
+  }
+
+  function topBar() {
+    const total = round.queue.length;
+    const pct = Math.round(round.pos / total * 100);
+    const part = currentItem.t === "s" ? "Eş anlamlı" : "Anlam";
+    let note = "";
+    if (synMode && !round.synCount)
+      note = thes
+        ? `<div class="warn">Bu turdaki kelimelerin eş anlamlısı bulunamadı.</div>`
+        : `<div class="warn">Bu kelimeler YDS listesinde yok. Diğer kelimeler için <b>Liste</b> sekmesinden eş anlamlı sözlüğünü yükle.</div>`;
+    return `
+      <div class="quiz-top">
+        <span>Soru ${round.pos + 1} / ${total} · <b>${part}</b></span>
+        <span>
+          <label><input type="checkbox" id="synToggle" ${synMode ? "checked" : ""}
+            onchange="toggleSyn(this.checked)">Eş anlamlıları da sor</label>
+          · <button class="link-btn" onclick="newRound()">Turu yeniden başlat</button>
+        </span>
+      </div>
+      <div class="progress"><div style="width:${pct}%"></div></div>
+      ${note}`;
+  }
+
+  function toggleSyn(on) {
+    synMode = on;
+    localStorage.setItem("synMode", on ? "1" : "0");
+  }
+
+  function renderQuiz() {
+    const area = document.getElementById("quizArea");
+    if (preparing) return;
+    if (words.length === 0) {
+      area.innerHTML = `<p style="text-align:center">Henüz kelime yok. <b>Kelime Ekle</b> sekmesinden başla.</p>`;
+      return;
+    }
+    if (!round) {
+      const pool = words.filter(w => !w.known);
+      if (pool.length === 0) {
+        area.innerHTML = `<div class="summary"><div style="font-size:48px">🎉</div>
+          <p>Tüm kelimeleri biliyorsun!</p>
+          <button class="btn gray" onclick="resetKnown()">Hepsini baştan çalış</button></div>`;
+        return;
+      }
+      startRound(pool);
+      return;
+    }
+    if (round.pos >= round.queue.length) { renderSummary(); return; }
+
+    currentItem = round.queue[round.pos];
+    current = findWord(currentItem.w);
+    if (!current || (currentItem.t === "s" && !synInfo(current.word, current.meaning).flat.length)) {
+      advance();   // kelime silinmiş ya da eş anlamlısı yok
+      return;
+    }
+    answered = false;
+    if (currentItem.t === "m") renderCard();
+    else renderSynQuestion();
+  }
+
+  // ---------- Anlam kartı ----------
+  function synHtml(info) {
+    if (!info.flat.length) return "";
+    if (info.source === "yds")
+      return `<div class="syn"><b>Eş anlamlıları (YDS):</b> ${escapeHtml(info.flat.join(", "))}</div>` +
+        (info.tr ? `<div class="sense">YDS listesindeki anlamı: ${escapeHtml(info.tr)}</div>` : "");
+    return info.groups.map(g =>
+      `<div class="syn"><span class="sense">${escapeHtml(g.label)}</span><br>≈ ${escapeHtml(g.syns.slice(0, 6).join(", "))}</div>`
+    ).join("");
+  }
+
+  function backHtml(w) {
+    return `
+      <div class="word-small">${escapeHtml(w.word)}</div>
+      <div class="tr">${escapeHtml(w.meaning || "(anlam bulunamadı)")}</div>
+      ${synHtml(synInfo(w.word, w.meaning))}
+      ${w.definition ? `<div class="def">${escapeHtml(w.definition)}</div>` : ""}
+      ${w.example ? `<div class="ex">“${escapeHtml(w.example)}”</div>` : ""}`;
+  }
+
+  function renderCard() {
+    document.getElementById("quizArea").innerHTML = topBar() + `
+      <div class="flip" id="card" onclick="flipCard()">
+        <div class="flip-inner">
+          <div class="face front">
+            <div class="word">${escapeHtml(current.word)}</div>
+            <button class="speak" onclick="event.stopPropagation(); speak()">🔊</button>
+            <div class="tap">Anlamını görmek için karta tıkla</div>
+          </div>
+          <div class="face back" id="cardBack">${backHtml(current)}</div>
+        </div>
+      </div>
+      <div class="quiz-buttons" id="quizButtons"></div>
+      <p class="hint" style="text-align:center;margin-top:16px">
+        Kısayol: Boşluk = kartı çevir · B = Biliyorum · N = Bilmiyorum · Enter = Sonraki
+      </p>`;
+    renderCardButtons();
+  }
+
+  function renderCardButtons() {
+    document.getElementById("quizButtons").innerHTML = answered
+      ? `<button class="btn" onclick="advance()">Sonraki →</button>`
+      : `<button class="btn green" onclick="markKnown()">✔ Biliyorum</button>
+         <button class="btn red" onclick="markUnknown()">✘ Bilmiyorum</button>`;
+  }
+
+  async function ensureMeaning(w) {
+    document.getElementById("cardBack").innerHTML = `<div class="tr">Sözlükte aranıyor...</div>`;
+    const res = await fetchMeaning(w.word);
+    if (!w.meaning) w.meaning = res.meaning;
+    w.definition = w.definition || res.definition;
+    w.example = w.example || res.example;
+    save();
+    const back = document.getElementById("cardBack");
+    if (current === w && back) back.innerHTML = backHtml(w);
+  }
+
+  function flipCard(forceOpen) {
+    const card = document.getElementById("card");
+    if (!card) return;
+    if (forceOpen) card.classList.add("flipped");
+    else card.classList.toggle("flipped");
+    if (card.classList.contains("flipped") && !current.meaning) ensureMeaning(current);
+  }
+
+  function markKnown() {
+    current.known = true;
+    round.correct++;
+    save();
+    advance();
+  }
+
+  function markUnknown() {
+    current.wrong++;
+    addMissed(current);
+    save(); saveRound();
+    answered = true;
+    flipCard(true);
+    renderCardButtons();
+  }
+
+  function speak() {
+    if (!("speechSynthesis" in window) || !current) return;
+    const u = new SpeechSynthesisUtterance(current.word);
+    u.lang = "en-US";
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  }
+
+  // ---------- Eş anlamlı sorusu ----------
+  let synQ = null;   // { correct, options, syns }
+
+  // Yanlış şıklar: önce kendi listendeki kelimeler, sonra YDS kelimeleri (sınav seviyesinde, tanıdık kelimeler)
+  function pickDistractors(word, syns, n) {
+    const w = normWord(word);
+    const bad = new Set([w, ...syns]);
+    const ok = c => c && !bad.has(c) && !sameRoot(c, w) && !syns.some(s => sameRoot(c, s))
+      && !synInfo(c, "").flat.includes(w);
+    const res = [];
+    const pool = [...shuffle(words.map(x => normWord(x.word))), ...shuffle(YDS_WORDS)];
+    for (const c of pool) {
+      if (res.length >= n) break;
+      if (ok(c) && !res.includes(c)) res.push(c);
+    }
+    return res;
+  }
+
+  function renderSynQuestion() {
+    const w = current;
+    const info = synInfo(w.word, w.meaning);
+    // Doğru şık: YDS listesinde ilk 4'ten; WordNet'te asıl anlamın en yaygın 2 eş anlamlısından
+    let pool = info.source === "yds" ? info.flat.slice(0, 4)
+      : [...info.groups[0].syns].sort((a, b) => commonness(b) - commonness(a)).slice(0, 2);
+    const correct = pool[Math.floor(Math.random() * pool.length)];
+    synQ = { correct, syns: info.flat, options: shuffle([correct, ...pickDistractors(w.word, info.flat, 3)]) };
+    document.getElementById("quizArea").innerHTML = topBar() + `
+      <div class="syn-q">
+        <div class="label">Hangisi bu kelimenin eş / yakın anlamlısı?</div>
+        <div class="word">${escapeHtml(w.word)}</div>
+      </div>
+      <div class="options">
+        ${synQ.options.map((o, i) =>
+          `<button class="opt" onclick="answerSyn(${i})">${i + 1}. ${escapeHtml(o)}</button>`).join("")}
+      </div>
+      <div class="syn-info" id="synInfo"></div>
+      <div class="quiz-buttons" id="quizButtons"></div>
+      <p class="hint" style="text-align:center;margin-top:16px">Kısayol: 1-4 = şık seç · Enter = Sonraki</p>`;
+  }
+
+  function answerSyn(i) {
+    if (answered) return;
+    answered = true;
+    const ok = synQ.options[i] === synQ.correct;
+    synQ.ok = ok;
+    synQ.missedBefore = round.missed.includes(current.word);
+    document.querySelectorAll(".opt").forEach((b, j) => {
+      b.disabled = true;
+      if (synQ.options[j] === synQ.correct) b.classList.add("right");
+      else if (j === i) b.classList.add("wrong");
+    });
+    if (ok) {
+      round.correct++;
+    } else {
+      current.wrong++;
+      current.known = false;
+      addMissed(current);
+    }
+    save(); saveRound();
+    document.getElementById("synInfo").innerHTML =
+      (ok ? "✔ Doğru! " : "✘ Yanlış. ") +
+      `<b>${escapeHtml(current.word)}</b> = ${escapeHtml((current.meaning || "").split("\n")[0])}<br>` +
+      `Eş anlamlıları: ${escapeHtml(synQ.syns.join(", "))}<br>` +
+      `<button class="link-btn" id="blockBtn" onclick="blockPair()">🚫 "${escapeHtml(synQ.correct)}" bu kelimeyle alakasız, bir daha sorma</button>`;
+    document.getElementById("quizButtons").innerHTML =
+      `<button class="btn" onclick="advance()">Sonraki →</button>`;
+  }
+
+  // Yanlış anlamdan gelen eşleşmeyi kalıcı olarak engelle
+  function blockPair() {
+    blocked.add(normWord(current.word) + "|" + synQ.correct);
+    localStorage.setItem("synBlock", JSON.stringify([...blocked]));
+    // Bu soruda yanlış yaptıysan sayılmasın
+    if (!synQ.ok) {
+      current.wrong = Math.max(0, current.wrong - 1);
+      if (!synQ.missedBefore) round.missed = round.missed.filter(x => x !== current.word);
+      save(); saveRound();
+    }
+    const btn = document.getElementById("blockBtn");
+    btn.outerHTML = `<span style="color:#2b8a3e">✔ "${escapeHtml(synQ.correct)}" bir daha sorulmayacak.</span>`;
+  }
+
+  // ---------- Tur sonu ----------
+  function renderSummary() {
+    const missed = round.missed.map(findWord).filter(Boolean);
+    const total = round.queue.length;
+    document.getElementById("quizArea").innerHTML = `
+      <div class="summary">
+        <div style="font-size:48px">${missed.length ? "📋" : "🎉"}</div>
+        <h2 style="margin:6px 0">Tur bitti!</h2>
+        <p>${total} sorudan <b>${round.correct}</b> tanesini bildin.</p>
+        ${missed.length ? `
+          <h3>Bilemediğin kelimeler (${missed.length})</h3>
+          <div class="missed">
+            ${missed.map(w => {
+              const syns = synInfo(w.word, w.meaning).flat;
+              return `
+              <div class="list-item"><div>
+                <b>${escapeHtml(w.word)}</b><br>
+                <small>${escapeHtml(w.meaning)}</small>
+                ${syns.length ? `<br><small style="color:#2b8a3e">≈ ${escapeHtml(syns.join(", "))}</small>` : ""}
+              </div></div>`;
+            }).join("")}
+          </div>` : `<p>Hiç hata yapmadın, tebrikler!</p>`}
+        <div class="quiz-buttons" style="margin-top:20px">
+          ${missed.length ? `<button class="btn red" onclick="retryMissed()">🔁 Bilemediklerimi tekrar çalış</button>` : ""}
+          <button class="btn" onclick="newRound()">Yeni tur (tüm kelimeler)</button>
+        </div>
+      </div>`;
+  }
+
+  // ---------- Klavye ----------
+  document.addEventListener("keydown", e => {
+    if (!document.getElementById("quiz").classList.contains("active")) return;
+    if (!round || !currentItem || round.pos >= round.queue.length) return;
+    if (e.target.tagName === "INPUT") return;
+    const k = e.key.toLowerCase();
+    if (answered && k === "enter") { e.preventDefault(); advance(); return; }
+    if (currentItem.t === "m") {
+      if (k === " ") { e.preventDefault(); flipCard(); }
+      else if (!answered && k === "b") markKnown();
+      else if (!answered && k === "n") markUnknown();
+    } else if (!answered && ["1", "2", "3", "4"].includes(k)) {
+      answerSyn(Number(k) - 1);
+    }
+  });
+
+  // ================== LİSTE ==================
+  function renderList() {
+    const list = document.getElementById("wordList");
+    if (words.length === 0) { list.innerHTML = "<p>Liste boş.</p>"; return; }
+    const sorted = [...words].sort((a, b) => a.known - b.known || a.word.localeCompare(b.word));
+    list.innerHTML = sorted.map(w => {
+      const i = words.indexOf(w);
+      const syns = synInfo(w.word, w.meaning).flat;
+      return `<div class="list-item">
+        <div>
+          <span class="tag ${w.known ? "known" : "unknown"}">${w.known ? "biliyorum" : "çalışılacak"}</span>
+          <b>${escapeHtml(w.word)}</b><br><small>${escapeHtml(w.meaning)}</small>
+          ${syns.length ? `<br><small style="color:#2b8a3e">≈ ${escapeHtml(syns.join(", "))}</small>` : ""}
+        </div>
+        <div>
+          <button class="link-btn" onclick="toggleKnown(${i})">${w.known ? "Geri al" : "Biliyorum"}</button>
+          <button class="link-btn" style="color:#e03131" onclick="removeWord(${i})">Sil</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function toggleKnown(i) { words[i].known = !words[i].known; save(); renderList(); }
+  function removeWord(i) { words.splice(i, 1); save(); renderList(); }
+
+  function resetKnown() {
+    words.forEach(w => w.known = false);
+    save(); renderList();
+    round = null; saveRound();
+    renderQuiz();
+  }
+  document.getElementById("resetKnownBtn").addEventListener("click", resetKnown);
+
+  document.getElementById("refreshAllBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("refreshAllBtn");
+    btn.disabled = true;
+    let updated = 0;
+    for (let i = 0; i < words.length; i++) {
+      btn.textContent = `Güncelleniyor... (${i + 1}/${words.length})`;
+      const res = await fetchMeaning(words[i].word);
+      if (res.meaning) { words[i].meaning = res.meaning; updated++; }
+      if (res.definition) words[i].definition = res.definition;
+      if (res.example) words[i].example = res.example;
+    }
+    save(); renderList();
+    btn.disabled = false;
+    btn.textContent = "🔄 Anlamları sözlükten güncelle";
+    showMsg("listMsg", `${updated} kelimenin anlamı güncellendi.`);
+  });
+
+  document.getElementById("clearAllBtn").addEventListener("click", () => {
+    const btn = document.getElementById("clearAllBtn");
+    if (btn.dataset.confirm) {
+      words = []; save(); renderList();
+      round = null; saveRound();
+      btn.textContent = "Tümünü sil"; delete btn.dataset.confirm;
+    } else {
+      btn.textContent = "Emin misin? Tekrar tıkla";
+      btn.dataset.confirm = "1";
+      setTimeout(() => { btn.textContent = "Tümünü sil"; delete btn.dataset.confirm; }, 3000);
+    }
+  });
+
+  function escapeHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ================== DIŞA / İÇE AKTARMA ==================
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const data = { app: "kelime-calisma", version: 1, date: new Date().toISOString(),
+                   words, blocked: [...blocked] };
+    const blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `kelimelerim-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    showMsg("listMsg", `${words.length} kelime dışa aktarıldı.`);
+  });
+
+  document.getElementById("importFile").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const list = Array.isArray(data) ? data : data.words;
+      if (!Array.isArray(list)) throw new Error("Bu dosya bir kelime listesi değil.");
+      let added = 0, merged = 0;
+      list.forEach(x => {
+        if (!x || !x.word) return;
+        const ex = words.find(w => w.word.toLowerCase() === String(x.word).toLowerCase());
+        if (ex) {
+          if (!ex.meaning && x.meaning) ex.meaning = x.meaning;
+          if (!ex.definition && x.definition) ex.definition = x.definition;
+          if (!ex.example && x.example) ex.example = x.example;
+          ex.known = ex.known || !!x.known;
+          ex.wrong = Math.max(ex.wrong || 0, x.wrong || 0);
+          merged++;
+        } else {
+          words.push({ word: String(x.word), meaning: x.meaning || "", definition: x.definition || "",
+                       example: x.example || "", known: !!x.known, wrong: x.wrong || 0 });
+          added++;
+        }
+      });
+      (data.blocked || []).forEach(b => blocked.add(b));
+      localStorage.setItem("synBlock", JSON.stringify([...blocked]));
+      save(); renderList();
+      round = null; saveRound();
+      showMsg("listMsg", `${added} yeni kelime eklendi, ${merged} kelime birleştirildi.`);
+    } catch (err) {
+      showMsg("listMsg", "İçe aktarılamadı: " + err.message);
+    }
+    e.target.value = "";
+  });
+
+  // ================== YÜKLENEBİLİR UYGULAMA ==================
+  // İnternet sitesi olarak açıldığında (https) çevrimdışı çalışma ve "uygulamayı yükle" düğmesi
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  let installEvent = null;
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault();
+    installEvent = e;
+    document.getElementById("installBtn").style.display = "inline-block";
+  });
+  document.getElementById("installBtn").addEventListener("click", async () => {
+    if (!installEvent) return;
+    installEvent.prompt();
+    await installEvent.userChoice;
+    installEvent = null;
+    document.getElementById("installBtn").style.display = "none";
+  });
+
+  // ---------- Başlangıç ----------
+  save();
+  (async () => {
+    await loadThesaurus();
+    renderQuiz();
+  })();
+</script>
+</body>
+</html>

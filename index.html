@@ -118,6 +118,22 @@
   .tag.unknown { background: #ffe3e3; color: #c92a2a; }
   .link-btn { background: none; border: none; color: #3b5bdb; cursor: pointer; font-size: 13px; white-space: nowrap; }
   .summary { text-align: center; }
+  /* ---------- Kutular ---------- */
+  .boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .box { border-radius: 14px; padding: 18px 14px; text-align: center; border: 2px solid; }
+  .box.unknown { background: #fff5f5; border-color: #ffc9c9; }
+  .box.new { background: #f3f6ff; border-color: #bac8ff; }
+  .box.known { background: #ebfbee; border-color: #b2f2bb; }
+  .box .title { font-weight: bold; font-size: 17px; }
+  .box .desc { font-size: 12px; color: #868e96; margin: 4px 0 8px; min-height: 30px; }
+  .box .count { font-size: 40px; font-weight: bold; margin-bottom: 10px; }
+  .box.unknown .count { color: #e03131; }
+  .box.new .count { color: #3b5bdb; }
+  .box.known .count { color: #2f9e44; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .filters button { padding: 6px 12px; border-radius: 16px; border: 1px solid #ced4da; background: #fff; cursor: pointer; font-size: 13px; }
+  .filters button.active { background: #3b5bdb; color: #fff; border-color: #3b5bdb; }
+  .tag.new { background: #e7ecff; color: #3b5bdb; }
   .summary .missed { text-align: left; margin-top: 10px; }
 </style>
 </head>
@@ -180,7 +196,7 @@
     </div>
     <div class="row" style="margin-bottom:12px">
       <button class="btn" id="refreshAllBtn">🔄 Anlamları sözlükten güncelle</button>
-      <button class="btn gray" id="resetKnownBtn">Bildiklerimi sıfırla</button>
+      <button class="btn gray" id="resetKnownBtn">✅ Bildiklerimi 🆕 yeniye taşı</button>
       <button class="btn red" id="clearAllBtn">Tümünü sil</button>
     </div>
     <div class="msg" id="listMsg"></div>
@@ -202,6 +218,24 @@
   // Daha önce internetten çekilmiş eş anlamlıları temizle (artık yerel sözlük kullanılıyor)
   words.forEach(w => { delete w.synonyms; delete w.synChecked; });
 
+  // ================== KUTULAR ==================
+  // Her kelimenin bir kutusu var: "new" (henüz çalışılmadı), "unknown" (bilmiyorum), "known" (biliyorum)
+  const BOX = {
+    unknown: { title: "❌ Bilmediklerim", desc: "Bilmiyorum dediğin kelimeler" },
+    new:     { title: "🆕 Yeni kelimeler", desc: "Henüz hiç çalışmadıkların" },
+    known:   { title: "✅ Bildiklerim",    desc: "Ara sıra tekrar etmek için" },
+    mix:     { title: "🔀 Yeni + bilmediklerim" },
+    retry:   { title: "🔁 Bu turda bilemediklerin" }
+  };
+  function defaultStatus(w) { return w.known ? "known" : (w.wrong > 0 ? "unknown" : "new"); }
+  words.forEach(w => { if (!w.status) w.status = defaultStatus(w); });
+  function setStatus(w, status) {
+    w.status = status;
+    w.known = status === "known";
+    w.lastSeen = Date.now();
+  }
+  function inBox(name) { return words.filter(w => w.status === name); }
+
   function load() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
     catch { return []; }
@@ -220,9 +254,8 @@
   }
 
   function updateStats() {
-    const known = words.filter(w => w.known).length;
     document.getElementById("stats").textContent =
-      `Toplam: ${words.length} · Biliyorum: ${known} · Çalışılacak: ${words.length - known}`;
+      `Toplam: ${words.length} · ✅ ${inBox("known").length} · ❌ ${inBox("unknown").length} · 🆕 ${inBox("new").length}`;
   }
 
   function shuffle(arr) {
@@ -901,7 +934,7 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
     words.push({
       word, meaning,
       definition: extra.definition || "", example: extra.example || "",
-      known: false, wrong: 0
+      known: false, wrong: 0, status: "new"
     });
     return true;
   }
@@ -977,7 +1010,7 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
   // Bir turda her kelime bir kez sorulur. Eş anlamlı soruları anlam kartlarının arasına karışık gelir
   // (kendi kartından en az 2 soru sonra). Bilinemeyenler tur sonunda listelenir.
 
-  function startRound(list) {
+  function startRound(list, box) {
     const cards = shuffle(list);
     const queue = cards.map(w => ({ w: w.word, t: "m" }));
     let synCount = 0;
@@ -990,7 +1023,7 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
         synCount++;
       });
     }
-    round = { queue, pos: 0, missed: [], correct: 0, synCount };
+    round = { queue, pos: 0, missed: [], correct: 0, synCount, box: box || "mix", toKnown: 0, toUnknown: 0 };
     saveRound();
     renderQuiz();
   }
@@ -1002,9 +1035,36 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
 
   function retryMissed() {
     const list = round.missed.map(findWord).filter(Boolean);
-    list.forEach(w => w.known = false);
-    save();
-    startRound(list);
+    startRound(list, "retry");
+  }
+
+  // Kutu seçme ekranı
+  function renderBoxes() {
+    const card = (name) => {
+      const n = inBox(name).length;
+      return `<div class="box ${name}">
+        <div class="title">${BOX[name].title}</div>
+        <div class="desc">${BOX[name].desc}</div>
+        <div class="count">${n}</div>
+        <button class="btn ${name === "unknown" ? "red" : name === "known" ? "green" : ""}" ${n ? "" : "disabled"}
+          onclick="startBox('${name}')">Çalış</button>
+      </div>`;
+    };
+    const mixN = inBox("new").length + inBox("unknown").length;
+    document.getElementById("quizArea").innerHTML = `
+      <h3 style="text-align:center;margin-top:0">Hangi kutuyu çalışmak istersin?</h3>
+      <div class="boxes">${card("unknown")}${card("new")}${card("known")}</div>
+      <div style="text-align:center;margin-top:16px">
+        <button class="btn gray" ${mixN ? "" : "disabled"} onclick="startBox('mix')">🔀 Yeni + bilmediklerim karışık (${mixN})</button>
+      </div>
+      <p class="hint" style="text-align:center;margin-top:14px">
+        Çalışırken <b>Biliyorum</b> dediğin kelime ✅ kutusuna, <b>Bilmiyorum</b> dediğin ❌ kutusuna geçer.
+      </p>`;
+  }
+
+  function startBox(name) {
+    const list = name === "mix" ? [...inBox("new"), ...inBox("unknown")] : inBox(name);
+    if (list.length) startRound(list, name);
   }
 
   function addMissed(w) {
@@ -1028,11 +1088,11 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
         : `<div class="warn">Bu kelimeler YDS listesinde yok. Diğer kelimeler için <b>Liste</b> sekmesinden eş anlamlı sözlüğünü yükle.</div>`;
     return `
       <div class="quiz-top">
-        <span>Soru ${round.pos + 1} / ${total} · <b>${part}</b></span>
+        <span>${(BOX[round.box] || BOX.mix).title} · Soru ${round.pos + 1} / ${total} · <b>${part}</b></span>
         <span>
           <label><input type="checkbox" id="synToggle" ${synMode ? "checked" : ""}
             onchange="toggleSyn(this.checked)">Eş anlamlıları da sor</label>
-          · <button class="link-btn" onclick="newRound()">Turu yeniden başlat</button>
+          · <button class="link-btn" onclick="newRound()">📦 Kutulara dön</button>
         </span>
       </div>
       <div class="progress"><div style="width:${pct}%"></div></div>
@@ -1051,17 +1111,7 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
       area.innerHTML = `<p style="text-align:center">Henüz kelime yok. <b>Kelime Ekle</b> sekmesinden başla.</p>`;
       return;
     }
-    if (!round) {
-      const pool = words.filter(w => !w.known);
-      if (pool.length === 0) {
-        area.innerHTML = `<div class="summary"><div style="font-size:48px">🎉</div>
-          <p>Tüm kelimeleri biliyorsun!</p>
-          <button class="btn gray" onclick="resetKnown()">Hepsini baştan çalış</button></div>`;
-        return;
-      }
-      startRound(pool);
-      return;
-    }
+    if (!round) { renderBoxes(); return; }
     if (round.pos >= round.queue.length) { renderSummary(); return; }
 
     currentItem = round.queue[round.pos];
@@ -1141,13 +1191,16 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
   }
 
   function markKnown() {
-    current.known = true;
+    if (current.status !== "known") round.toKnown++;
+    setStatus(current, "known");
     round.correct++;
     save();
     advance();
   }
 
   function markUnknown() {
+    if (current.status !== "unknown") round.toUnknown++;
+    setStatus(current, "unknown");
     current.wrong++;
     addMissed(current);
     save(); saveRound();
@@ -1210,6 +1263,7 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
     const ok = synQ.options[i] === synQ.correct;
     synQ.ok = ok;
     synQ.missedBefore = round.missed.includes(current.word);
+    synQ.prevStatus = current.status;
     document.querySelectorAll(".opt").forEach((b, j) => {
       b.disabled = true;
       if (synQ.options[j] === synQ.correct) b.classList.add("right");
@@ -1219,7 +1273,8 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
       round.correct++;
     } else {
       current.wrong++;
-      current.known = false;
+      if (current.status !== "unknown") round.toUnknown++;
+      setStatus(current, "unknown");
       addMissed(current);
     }
     save(); saveRound();
@@ -1239,6 +1294,8 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
     // Bu soruda yanlış yaptıysan sayılmasın
     if (!synQ.ok) {
       current.wrong = Math.max(0, current.wrong - 1);
+      if (synQ.prevStatus !== "unknown") round.toUnknown = Math.max(0, round.toUnknown - 1);
+      setStatus(current, synQ.prevStatus);
       if (!synQ.missedBefore) round.missed = round.missed.filter(x => x !== current.word);
       save(); saveRound();
     }
@@ -1255,6 +1312,10 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
         <div style="font-size:48px">${missed.length ? "📋" : "🎉"}</div>
         <h2 style="margin:6px 0">Tur bitti!</h2>
         <p>${total} sorudan <b>${round.correct}</b> tanesini bildin.</p>
+        <p style="font-size:14px;color:#555">
+          ✅ Bildiklerim kutusuna giden: <b>${round.toKnown}</b> ·
+          ❌ Bilmediklerim kutusuna giden: <b>${round.toUnknown}</b>
+        </p>
         ${missed.length ? `
           <h3>Bilemediğin kelimeler (${missed.length})</h3>
           <div class="missed">
@@ -1270,7 +1331,7 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
           </div>` : `<p>Hiç hata yapmadın, tebrikler!</p>`}
         <div class="quiz-buttons" style="margin-top:20px">
           ${missed.length ? `<button class="btn red" onclick="retryMissed()">🔁 Bilemediklerimi tekrar çalış</button>` : ""}
-          <button class="btn" onclick="newRound()">Yeni tur (tüm kelimeler)</button>
+          <button class="btn" onclick="newRound()">📦 Kutulara dön</button>
         </div>
       </div>`;
   }
@@ -1292,32 +1353,49 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
   });
 
   // ================== LİSTE ==================
+  let listFilter = "all";
+  const ORDER = { unknown: 0, new: 1, known: 2 };
+  const TAG = { unknown: "❌ bilmiyorum", new: "🆕 yeni", known: "✅ biliyorum" };
+
   function renderList() {
     const list = document.getElementById("wordList");
     if (words.length === 0) { list.innerHTML = "<p>Liste boş.</p>"; return; }
-    const sorted = [...words].sort((a, b) => a.known - b.known || a.word.localeCompare(b.word));
-    list.innerHTML = sorted.map(w => {
+    const f = (key, label) =>
+      `<button class="${listFilter === key ? "active" : ""}" onclick="listFilter='${key}';renderList()">${label}</button>`;
+    const shown = words.filter(w => listFilter === "all" || w.status === listFilter)
+      .sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.word.localeCompare(b.word));
+    const day = t => t ? new Date(t).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) : "";
+    list.innerHTML = `
+      <div class="filters">
+        ${f("all", `Tümü (${words.length})`)}
+        ${f("unknown", `❌ Bilmediklerim (${inBox("unknown").length})`)}
+        ${f("new", `🆕 Yeni (${inBox("new").length})`)}
+        ${f("known", `✅ Bildiklerim (${inBox("known").length})`)}
+      </div>` + (shown.length ? shown.map(w => {
       const i = words.indexOf(w);
       const syns = synInfo(w.word, w.meaning).flat;
       return `<div class="list-item">
         <div>
-          <span class="tag ${w.known ? "known" : "unknown"}">${w.known ? "biliyorum" : "çalışılacak"}</span>
-          <b>${escapeHtml(w.word)}</b><br><small>${escapeHtml(w.meaning)}</small>
+          <span class="tag ${w.status}">${TAG[w.status]}</span>
+          <b>${escapeHtml(w.word)}</b>
+          ${w.lastSeen ? `<small style="margin-left:6px">son çalışma: ${day(w.lastSeen)}</small>` : ""}
+          <br><small>${escapeHtml(w.meaning)}</small>
           ${syns.length ? `<br><small style="color:#2b8a3e">≈ ${escapeHtml(syns.join(", "))}</small>` : ""}
         </div>
         <div>
-          <button class="link-btn" onclick="toggleKnown(${i})">${w.known ? "Geri al" : "Biliyorum"}</button>
-          <button class="link-btn" style="color:#e03131" onclick="removeWord(${i})">Sil</button>
+          ${w.status !== "known" ? `<button class="link-btn" style="color:#2f9e44" onclick="moveWord(${i},'known')">✅ Biliyorum</button><br>` : ""}
+          ${w.status !== "unknown" ? `<button class="link-btn" style="color:#e03131" onclick="moveWord(${i},'unknown')">❌ Bilmiyorum</button><br>` : ""}
+          <button class="link-btn" style="color:#868e96" onclick="removeWord(${i})">Sil</button>
         </div>
       </div>`;
-    }).join("");
+    }).join("") : "<p>Bu kutu boş.</p>");
   }
 
-  function toggleKnown(i) { words[i].known = !words[i].known; save(); renderList(); }
+  function moveWord(i, status) { setStatus(words[i], status); save(); renderList(); }
   function removeWord(i) { words.splice(i, 1); save(); renderList(); }
 
   function resetKnown() {
-    words.forEach(w => w.known = false);
+    inBox("known").forEach(w => { w.status = "new"; w.known = false; });
     save(); renderList();
     round = null; saveRound();
     renderQuiz();
@@ -1387,12 +1465,20 @@ rule out: exclude, eliminate | olasılık dışı bırakmak, elemek
           if (!ex.meaning && x.meaning) ex.meaning = x.meaning;
           if (!ex.definition && x.definition) ex.definition = x.definition;
           if (!ex.example && x.example) ex.example = x.example;
-          ex.known = ex.known || !!x.known;
+          // İki cihazdan hangisinde daha yeni çalışıldıysa onun kutusu geçerli
+          if ((x.lastSeen || 0) > (ex.lastSeen || 0)) {
+            ex.status = x.status || defaultStatus(x);
+            ex.lastSeen = x.lastSeen;
+          } else if (!ex.lastSeen && !x.lastSeen && ex.status === "new") {
+            ex.status = x.status || defaultStatus(x);
+          }
+          ex.known = ex.status === "known";
           ex.wrong = Math.max(ex.wrong || 0, x.wrong || 0);
           merged++;
         } else {
           words.push({ word: String(x.word), meaning: x.meaning || "", definition: x.definition || "",
-                       example: x.example || "", known: !!x.known, wrong: x.wrong || 0 });
+                       example: x.example || "", known: !!x.known, wrong: x.wrong || 0,
+                       status: x.status || defaultStatus(x), lastSeen: x.lastSeen || 0 });
           added++;
         }
       });

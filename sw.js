@@ -1,6 +1,6 @@
 // Kelime Çalışma — çevrimdışı çalışma için önbellek
 // Uygulamayı güncellediğinde aşağıdaki sürüm numarasını artır (v2, v3...).
-const CACHE = "kelime-v2";
+const CACHE = "kelime-v3";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
